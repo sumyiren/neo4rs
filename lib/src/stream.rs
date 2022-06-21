@@ -5,7 +5,9 @@ use crate::row::*;
 use crate::types::*;
 use std::collections::VecDeque;
 use std::sync::Arc;
+use deadpool::managed::Object;
 use tokio::sync::Mutex;
+use crate::connection::Connection;
 
 /// An abstraction over a stream of rows, this is returned as a result of [`Graph::execute`] or
 /// [`Txn::execute`] operations
@@ -34,7 +36,7 @@ impl RowStream {
         qid: i64,
         fields: BoltList,
         fetch_size: usize,
-        connection: Arc<Mutex<ManagedConnection>>,
+        connection: Arc<Mutex<Object<Connection, Error>>>,
     ) -> RowStream {
         RowStream {
             qid,
