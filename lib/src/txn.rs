@@ -28,23 +28,23 @@ impl Txn {
         }
     }
 
-    /// Runs multiple queries one after the other in the same connection
-    pub async fn run_queries(&self, queries: Vec<Query>) -> Result<()> {
-        for query in queries.into_iter() {
-            self.run(query).await?;
-        }
-        Ok(())
-    }
+    // /// Runs multiple queries one after the other in the same connection
+    // pub async fn run_queries(&self, queries: Vec<Query>) -> Result<()> {
+    //     for query in queries.into_iter() {
+    //         self.run(query).await?;
+    //     }
+    //     Ok(())
+    // }
 
-    /// Runs a single query and discards the stream.
-    pub async fn run(&self, q: Query) -> Result<()> {
-        q.run(&self.config, self.connection.clone()).await
-    }
-
-    /// Executes a query and returns a [`RowStream`]
-    pub async fn execute(&self, q: Query) -> Result<RowStream> {
-        q.execute(&self.config, self.connection.clone()).await
-    }
+    // /// Runs a single query and discards the stream.
+    // pub async fn run(&self, q: Query) -> Result<()> {
+    //     q.run(&self.config, self.connection.clone()).await
+    // }
+    //
+    // /// Executes a query and returns a [`RowStream`]
+    // pub async fn execute(&self, q: Query) -> Result<RowStream> {
+    //     q.execute(&self.config, self.connection.clone()).await
+    // }
 
     /// Commits the transaction in progress
     pub async fn commit(self) -> Result<()> {

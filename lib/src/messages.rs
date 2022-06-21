@@ -27,6 +27,7 @@ use run::Run;
 use std::cell::RefCell;
 use std::rc::Rc;
 use success::Success;
+use crate::Query;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum BoltResponse {
@@ -57,7 +58,8 @@ impl BoltRequest {
         BoltRequest::HelloMessage(Hello::new(data))
     }
 
-    pub fn run(db: &str, query: &str, params: BoltMap) -> BoltRequest {
+    pub fn run(db: &str, query: Query) -> BoltRequest {
+        let Query { query, params } = query;
         BoltRequest::RunMessage(Run::new(db.into(), query.into(), params))
     }
 

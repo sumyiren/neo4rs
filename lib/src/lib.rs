@@ -762,6 +762,8 @@ mod stream;
 mod txn;
 mod types;
 mod version;
+mod session;
+mod driver;
 
 pub use crate::config::{config, Config, ConfigBuilder};
 pub use crate::errors::*;
