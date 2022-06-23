@@ -25,6 +25,11 @@ impl Graph {
         Ok(Graph { config })
     }
 
+    pub async fn new_with_max_connections(uri: &str, user: &str, password: &str, max_connections: usize) -> Result<Self> {
+        let config = config().uri(uri).user(user).password(password).max_connections(max_connections).build()?;
+        Ok(Graph { config })
+    }
+
     pub async fn create_driver(&self) -> Driver {
         Driver::new(self.config.clone()).await
     }

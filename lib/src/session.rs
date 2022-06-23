@@ -1,6 +1,6 @@
 use std::sync::{Arc};
 use tokio::sync::Mutex;
-use crate::{config, Config, Query, RowStream};
+use crate::{config, Config, Query, RowStream, Txn};
 use crate::connection::Connection;
 use crate::messages::{BoltRequest, BoltResponse};
 use crate::pool::ConnectionPool;
@@ -32,6 +32,11 @@ impl Session {
             }
             msg => Err(unexpected(msg, "RUN")),
         }
+    }
+
+    pub async fn begin_transaction(&self) -> Result<Txn> {
+        let connection = Arc::new(Mutex::new(self.connection_pool.get().await?));
+        Txn::new(self.config.clone(), connection.clone()).await
     }
 
     // read and write transactions are very similar, but are written like so due to clustering?

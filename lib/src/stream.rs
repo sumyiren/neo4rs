@@ -81,6 +81,7 @@ impl RowStream {
                     self.state = State::Ready;
                 }
                 State::Complete => {
+                    println!{"stuck in loop"};
                     return Ok(self.buffer.pop_front());
                 }
             }

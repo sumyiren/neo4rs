@@ -1,11 +1,12 @@
 use crate::config::Config;
-use crate::errors::*;
+use crate::errors::{Result, unexpected};
 use crate::messages::*;
 use crate::pool::*;
 use crate::query::*;
 use crate::stream::*;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use crate::types::BoltList;
 
 /// A handle which is used to control a transaction, created as a result of [`Graph::start_txn`]
 ///
@@ -17,12 +18,12 @@ pub struct Txn {
 }
 
 impl Txn {
-    pub(crate) async fn new(config: Config, mut connection: ManagedConnection) -> Result<Self> {
+    pub(crate) async fn new(config: Config, mut connection: Arc<Mutex<ManagedConnection>>) -> Result<Self> {
         let begin = BoltRequest::begin();
-        match connection.send_recv(begin).await? {
+        match connection.lock().await.send_recv(begin).await? {
             BoltResponse::SuccessMessage(_) => Ok(Txn {
                 config,
-                connection: Arc::new(Mutex::new(connection)),
+                connection: connection.clone(),
             }),
             msg => Err(unexpected(msg, "BEGIN")),
         }
@@ -40,6 +41,23 @@ impl Txn {
     // pub async fn run(&self, q: Query) -> Result<()> {
     //     q.run(&self.config, self.connection.clone()).await
     // }
+
+    pub async fn run(&self, query: Query) -> Result<RowStream> {
+        let run = BoltRequest::run(&self.config.db.clone(), query);
+        match self.connection.clone().lock().await.send_recv(run).await {
+            Ok(BoltResponse::SuccessMessage(success)) => {
+                let fields: BoltList = success.get("fields").unwrap_or_else(BoltList::new);
+                let qid: i64 = success.get("qid").unwrap_or(-1);
+                Ok(RowStream::new(
+                    qid,
+                    fields,
+                    self.config.clone().fetch_size,
+                    self.connection.clone(),
+                ))
+            }
+            msg => Err(unexpected(msg, "RUN")),
+        }
+    }
     //
     // /// Executes a query and returns a [`RowStream`]
     // pub async fn execute(&self, q: Query) -> Result<RowStream> {
