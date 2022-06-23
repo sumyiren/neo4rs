@@ -1,5 +1,5 @@
 use tokio;
-use neo4rs::{query, Graph, Query, Node};
+use neo4rs::{query, Graph, Query, Node, Session};
 use std::sync::Arc;
 
 // let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
@@ -16,31 +16,26 @@ mod integration_tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
 
-    async fn setup_graph(max_connections: usize) -> Arc<Graph> {
+    async fn setup_session(max_connections: usize) -> Session {
         let uri = "127.0.0.1:7687";
         let user = "integration_test_user";
         let pass = "integration_test_pass";
         let graph =  Arc::new(Graph::new_with_max_connections(&uri, user, pass, max_connections).await.unwrap());
-        graph
+        let driver = graph.create_driver().await;
+        let session = driver.create_session();
+        session.run(query("MATCH (n) DETACH DELETE n")).await;
+        session
     }
 
     #[tokio::test]
     async fn test_session_run() {
-        let graph = setup_graph(DEFAULT_MAX_CONNECTIONS).await;
-        let driver = graph.create_driver().await;
-        let session = driver.create_session();
-        let res = session.run(query("MATCH (n) DETACH DELETE n")).await;
-        match res {
-            Ok(ok) => println!("a ok"),
-            Err(notok) => println!("a error"),
-        }
+        let session = setup_session(DEFAULT_MAX_CONNECTIONS).await;
+        let result = session.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await;
     }
 
     #[tokio::test]
     async fn test_write_transaction() {
-        let graph = setup_graph(DEFAULT_MAX_CONNECTIONS).await;
-        let driver = graph.create_driver().await;
-        let session = driver.create_session();
+        let session = setup_session(DEFAULT_MAX_CONNECTIONS).await;
         let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
         while let Ok(Some(row)) = result.next().await {
             let node: Node = row.get("n").unwrap();
@@ -51,9 +46,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_read_transaction_pool() {
-        let graph = setup_graph(1).await;
-        let driver = graph.create_driver().await;
-        let session = driver.create_session();
+        let session = setup_session(DEFAULT_MAX_CONNECTIONS).await;
         {
             let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
             while let Ok(Some(row)) = result.next().await {
@@ -72,4 +65,51 @@ mod integration_tests {
             }
         }
     }
+
+    #[tokio::test]
+    async fn test_unfinished_transaction() {
+        let session = setup_session(1).await;
+        {
+            let txn = session.begin_transaction().await.unwrap();
+            let mut result = txn.run(query("CREATE (n: Person {name:'apple-pie'}) RETURN n")).await.unwrap();
+        }
+        {
+            let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
+            let mut all_results: Vec<String> = Vec::new();
+            while let Ok(Some(row)) = result.next().await {
+                let node: Node = row.get("n").unwrap();
+                let name: String = node.get("name").unwrap();
+                all_results.push(name);
+            }
+            assert_eq!(all_results.len(), 0)
+        }
+    }
+
+    #[tokio::test]
+    async fn test_commit_transaction() {
+        let session = setup_session(1).await;
+        {
+            let txn = session.begin_transaction().await.unwrap();
+            let mut result = txn.run(query("CREATE (n: Person {name:'apple-pie'}) RETURN n")).await.unwrap();
+            txn.discard_and_commit().await;
+        }
+        {
+            let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
+            let mut all_results: Vec<String> = Vec::new();
+            while let Ok(Some(row)) = result.next().await {
+                let node: Node = row.get("n").unwrap();
+                let name: String = node.get("name").unwrap();
+                all_results.push(name);
+            }
+            assert_eq!(all_results.len(), 1)
+        }
+    }
 }
+
+
+
+
+
+
+
+

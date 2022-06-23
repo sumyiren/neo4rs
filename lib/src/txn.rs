@@ -58,6 +58,18 @@ impl Txn {
             msg => Err(unexpected(msg, "RUN")),
         }
     }
+
+    pub async fn discard_and_commit(&self) -> Result<()> {
+        self.discard().await;
+        self.commit().await
+    }
+
+    pub async fn discard(&self) -> Result<()> {
+        match self.connection.clone().lock().await.send_recv(BoltRequest::discard()).await? {
+            BoltResponse::SuccessMessage(_) => Ok(()),
+            msg => Err(unexpected(msg, "DISCARD")),
+        }
+    }
     //
     // /// Executes a query and returns a [`RowStream`]
     // pub async fn execute(&self, q: Query) -> Result<RowStream> {
@@ -65,7 +77,7 @@ impl Txn {
     // }
 
     /// Commits the transaction in progress
-    pub async fn commit(self) -> Result<()> {
+    pub async fn commit(&self) -> Result<()> {
         let commit = BoltRequest::commit();
         match self.connection.lock().await.send_recv(commit).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
@@ -74,7 +86,7 @@ impl Txn {
     }
 
     /// rollback/abort the current transaction
-    pub async fn rollback(self) -> Result<()> {
+    pub async fn rollback(&self) -> Result<()> {
         let rollback = BoltRequest::rollback();
         match self.connection.lock().await.send_recv(rollback).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),

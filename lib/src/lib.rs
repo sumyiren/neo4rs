@@ -793,6 +793,7 @@ mod driver;
 pub use crate::config::{config, Config, ConfigBuilder};
 pub use crate::errors::*;
 pub use crate::graph::{query, Graph};
+pub use crate::session::{Session};
 pub use crate::query::Query;
 pub use crate::row::{Node, Path, Point2D, Point3D, Relation, Row, UnboundedRelation};
 pub use crate::stream::RowStream;
