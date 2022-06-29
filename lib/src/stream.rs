@@ -52,15 +52,15 @@ impl RowStream {
     /// if the buffer is empty and the server has more rows left to consume, then a new batch of rows are fetched from the server (using the
     /// fetch_size value configured see [`ConfigBuilder::fetch_size`])
     pub async fn next(&mut self) -> Result<Option<Row>> {
-        let mut connection = self.connection.lock().await;
+        // let mut connection = self.connection.clone().lock().await;
         loop {
             match self.state {
                 State::Ready => {
                     let pull = BoltRequest::pull(self.fetch_size, self.qid);
-                    connection.send(pull).await?;
+                    self.connection.clone().lock().await.send(pull).await?;
                     self.state = State::Streaming;
                 }
-                State::Streaming => match connection.recv().await {
+                State::Streaming => match self.connection.clone().lock().await.recv().await {
                     Ok(BoltResponse::SuccessMessage(s)) => {
                         if s.get("has_more").unwrap_or(false) {
                             self.state = State::Buffered;
@@ -85,6 +85,15 @@ impl RowStream {
                     return Ok(self.buffer.pop_front());
                 }
             }
+        }
+    }
+
+    pub async fn consume(&self) -> Result<()> {
+        match self.connection.clone().lock().await.send_recv(BoltRequest::discard()).await? {
+            BoltResponse::SuccessMessage(_) => {
+                Ok(())
+            },
+            msg => Err(unexpected(msg, "DISCARD")),
         }
     }
 }

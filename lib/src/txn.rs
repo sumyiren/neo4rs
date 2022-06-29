@@ -59,12 +59,12 @@ impl Txn {
         }
     }
 
-    pub async fn discard_and_commit(&self) -> Result<()> {
-        self.discard().await;
+    pub async fn consume_and_commit(&self) -> Result<()> {
+        self.consume().await;
         self.commit().await
     }
 
-    pub async fn discard(&self) -> Result<()> {
+    pub async fn consume(&self) -> Result<()> {
         match self.connection.clone().lock().await.send_recv(BoltRequest::discard()).await? {
             BoltResponse::SuccessMessage(_) => Ok(()),
             msg => Err(unexpected(msg, "DISCARD")),

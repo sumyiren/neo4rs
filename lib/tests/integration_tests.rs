@@ -23,87 +23,133 @@ mod integration_tests {
         let graph =  Arc::new(Graph::new_with_max_connections(&uri, user, pass, max_connections).await.unwrap());
         let driver = graph.create_driver().await;
         let session = driver.create_session();
-        session.run(query("MATCH (n) DETACH DELETE n")).await;
+        session.execute(query("MATCH (n) DETACH DELETE n")).await.unwrap();
         session
     }
 
     #[tokio::test]
-    async fn test_session_run() {
-        let session = setup_session(DEFAULT_MAX_CONNECTIONS).await;
-        let result = session.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await;
+    async fn test_session_execute() {
+        let session = setup_session(1).await;
+        let result = session.execute(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
     }
 
     #[tokio::test]
-    async fn test_write_transaction() {
-        let session = setup_session(DEFAULT_MAX_CONNECTIONS).await;
-        let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+    async fn test_session_run() {
+        let session = setup_session(1).await;
+        let mut result = session.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
         while let Ok(Some(row)) = result.next().await {
             let node: Node = row.get("n").unwrap();
             let name: String = node.get("name").unwrap();
-            println!("{}", name);
+            assert_eq!(name, "apple".to_string())
         }
     }
 
     #[tokio::test]
-    async fn test_read_transaction_pool() {
-        let session = setup_session(DEFAULT_MAX_CONNECTIONS).await;
-        {
-            let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
-            while let Ok(Some(row)) = result.next().await {
-                let node: Node = row.get("n").unwrap();
-                let name: String = node.get("name").unwrap();
-                println!("{}", name);
-            }
-        } // connection is released and returned to pool here
-
-        {
-            let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
-            while let Ok(Some(row)) = result.next().await {
-                let node: Node = row.get("n").unwrap();
-                let name: String = node.get("name").unwrap();
-                println!("{}", name);
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn test_unfinished_transaction() {
+    async fn test_session_run_consume() {
         let session = setup_session(1).await;
         {
-            let txn = session.begin_transaction().await.unwrap();
-            let mut result = txn.run(query("CREATE (n: Person {name:'apple-pie'}) RETURN n")).await.unwrap();
+            let mut result = session.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+            result.consume().await;
         }
         {
-            let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
-            let mut all_results: Vec<String> = Vec::new();
+            let mut result = session.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+            result.consume().await;
+        }
+        {
+            let mut result = session.run(query("MATCH (n: Person) RETURN n")).await.unwrap();
+            let mut count = 0;
             while let Ok(Some(row)) = result.next().await {
                 let node: Node = row.get("n").unwrap();
                 let name: String = node.get("name").unwrap();
-                all_results.push(name);
+                count += 1;
             }
-            assert_eq!(all_results.len(), 0)
+            assert_eq!(count, 2)
         }
-    }
 
-    #[tokio::test]
-    async fn test_commit_transaction() {
-        let session = setup_session(1).await;
-        {
-            let txn = session.begin_transaction().await.unwrap();
-            let mut result = txn.run(query("CREATE (n: Person {name:'apple-pie'}) RETURN n")).await.unwrap();
-            txn.discard_and_commit().await;
-        }
-        {
-            let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
-            let mut all_results: Vec<String> = Vec::new();
-            while let Ok(Some(row)) = result.next().await {
-                let node: Node = row.get("n").unwrap();
-                let name: String = node.get("name").unwrap();
-                all_results.push(name);
-            }
-            assert_eq!(all_results.len(), 1)
-        }
     }
+    //
+    // #[tokio::test]
+    // async fn test_write_transaction() {
+    //     let session = setup_session(1).await;
+    //     {
+    //         let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+    //         while let Ok(Some(row)) = result.next().await {
+    //             let node: Node = row.get("n").unwrap();
+    //             let name: String = node.get("name").unwrap();
+    //             println!("{}", name);
+    //         }
+    //     }
+    //
+    //     {
+    //         let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+    //         while let Ok(Some(row)) = result.next().await {
+    //             let node: Node = row.get("n").unwrap();
+    //             let name: String = node.get("name").unwrap();
+    //             println!("{}", name);
+    //         }
+    //     }
+    // }
+    //
+    // #[tokio::test]
+    // async fn test_read_transaction_pool() {
+    //     let session = setup_session(1).await;
+    //     {
+    //         let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
+    //         while let Ok(Some(row)) = result.next().await {
+    //             let node: Node = row.get("n").unwrap();
+    //             let name: String = node.get("name").unwrap();
+    //             println!("{}", name);
+    //         }
+    //     } // connection is released and returned to pool here
+    //
+    //     {
+    //         let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
+    //         while let Ok(Some(row)) = result.next().await {
+    //             let node: Node = row.get("n").unwrap();
+    //             let name: String = node.get("name").unwrap();
+    //             println!("{}", name);
+    //         }
+    //     }
+    // }
+    //
+    // #[tokio::test]
+    // async fn test_unfinished_transaction() {
+    //     let session = setup_session(1).await;
+    //     {
+    //         let txn = session.begin_transaction().await.unwrap();
+    //         let mut result = txn.run(query("CREATE (n: Person {name:'apple-pie'}) RETURN n")).await.unwrap();
+    //     }
+    //     {
+    //         let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
+    //         let mut all_results: Vec<String> = Vec::new();
+    //         while let Ok(Some(row)) = result.next().await {
+    //             let node: Node = row.get("n").unwrap();
+    //             let name: String = node.get("name").unwrap();
+    //             all_results.push(name);
+    //         }
+    //         assert_eq!(all_results.len(), 0)
+    //     }
+    // }
+    //
+    // #[tokio::test]
+    // async fn test_commit_transaction() {
+    //     let session = setup_session(1).await;
+    //     {
+    //         let txn = session.begin_transaction().await.unwrap();
+    //         let mut result = txn.run(query("CREATE (n: Person {name:'apple-pie'}) RETURN n")).await.unwrap();
+    //         txn.consume_and_commit().await;
+    //     }
+    //     {
+    //         let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
+    //         let mut all_results: Vec<String> = Vec::new();
+    //         while let Ok(Some(row)) = result.next().await {
+    //             let node: Node = row.get("n").unwrap();
+    //             let name: String = node.get("name").unwrap();
+    //             all_results.push(name);
+    //         }
+    //         assert_eq!(all_results.len(), 1)
+    //     }
+    // }
 }
 
 

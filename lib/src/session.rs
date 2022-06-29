@@ -20,7 +20,7 @@ impl Session {
         }
     }
 
-    pub async fn run(&self, query: Query) -> Result<()> {
+    pub async fn execute(&self, query: Query) -> Result<()> {
         let mut connection = self.connection_pool.get().await?;
         let run = BoltRequest::run(&self.config.db.clone(), query);
         match connection.send_recv(run).await? {
@@ -33,6 +33,35 @@ impl Session {
             msg => Err(unexpected(msg, "RUN")),
         }
     }
+
+    pub async fn run(&self, query: Query) -> Result<RowStream> {
+        let mut connection = Arc::new(Mutex::new(self.connection_pool.get().await?));
+        let run = BoltRequest::run(&self.config.db.clone(), query);
+        match connection.clone().lock().await.send_recv(run).await {
+            Ok(BoltResponse::SuccessMessage(success)) => {
+                let fields: BoltList = success.get("fields").unwrap_or_else(BoltList::new);
+                let qid: i64 = success.get("qid").unwrap_or(-1);
+                Ok(RowStream::new(
+                    qid,
+                    fields,
+                    self.config.clone().fetch_size,
+                    connection.clone(),
+                ))
+            }
+            msg => Err(unexpected(msg, "RUN")),
+        }
+    }
+
+    // pub async fn run(&self, query: Query) -> Result<()> {
+    //     let mut connection = Arc::new(Mutex::new(self.connection_pool.get().await?));
+    //     let run = BoltRequest::run(&self.config.db.clone(), query);
+    //     match connection.clone().lock().await.send_recv(run).await? {
+    //         BoltResponse::SuccessMessage(_) => {
+    //             Ok(())
+    //         }
+    //         msg => Err(unexpected(msg, "RUN")),
+    //     }
+    // }
 
     pub async fn begin_transaction(&self) -> Result<Txn> {
         let connection = Arc::new(Mutex::new(self.connection_pool.get().await?));
