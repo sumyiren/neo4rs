@@ -1,6 +1,7 @@
 use tokio;
 use neo4rs::{query, Graph, Query, Node, Session};
 use std::sync::Arc;
+use ::futures::future::{BoxFuture, FutureExt};
 
 // let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
 // while let Ok(Some(row)) = result.next().await {
@@ -65,30 +66,36 @@ mod integration_tests {
             }
             assert_eq!(count, 2)
         }
-
     }
-    //
-    // #[tokio::test]
-    // async fn test_write_transaction() {
-    //     let session = setup_session(1).await;
-    //     {
-    //         let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
-    //         while let Ok(Some(row)) = result.next().await {
-    //             let node: Node = row.get("n").unwrap();
-    //             let name: String = node.get("name").unwrap();
-    //             println!("{}", name);
-    //         }
-    //     }
-    //
-    //     {
-    //         let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
-    //         while let Ok(Some(row)) = result.next().await {
-    //             let node: Node = row.get("n").unwrap();
-    //             let name: String = node.get("name").unwrap();
-    //             println!("{}", name);
-    //         }
-    //     }
-    // }
+
+    #[tokio::test]
+    async fn test_write_transaction() {
+        let mut session = setup_session(1).await;
+        // {
+        //     let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+        //     while let Ok(Some(row)) = result.next().await {
+        //         let node: Node = row.get("n").unwrap();
+        //         let name: String = node.get("name").unwrap();
+        //         println!("{}", name);
+        //     }
+        // }
+
+        {
+            let mut result = session.write_transaction(
+                |txn| async move {
+                    // let mut result = txn.run(query("CREATE (n: Person {name:'apple-pie'}) RETURN n")).await.unwrap();
+                    // txn.consume().await;
+                    // txn.commit().await;
+                    txn.execute(query("CREATE (n: Person {name:'apple'}) RETURN n")).await;
+                    // tx.run(query("CREATE (n: Person {name:'apple'}) RETURN n"));
+                }.boxed()).await;
+            // while let Ok(Some(row)) = result.next().await {
+            //     let node: Node = row.get("n").unwrap();
+            //     let name: String = node.get("name").unwrap();
+            //     println!("{}", name);
+            // }
+        }
+    }
     //
     // #[tokio::test]
     // async fn test_read_transaction_pool() {
@@ -111,7 +118,27 @@ mod integration_tests {
     //         }
     //     }
     // }
-    //
+
+    #[tokio::test]
+    async fn test_execute_transaction() {
+        let session = setup_session(1).await;
+        {
+            let txn = session.begin_transaction().await.unwrap();
+            txn.execute(query("CREATE (n: Person {name:'apple-pie'}) RETURN n")).await.unwrap();
+            txn.commit().await;
+        }
+        {
+            let mut result = session.run(query("MATCH (n: Person) RETURN n")).await.unwrap();
+            let mut all_results: Vec<String> = Vec::new();
+            while let Ok(Some(row)) = result.next().await {
+                let node: Node = row.get("n").unwrap();
+                let name: String = node.get("name").unwrap();
+                all_results.push(name);
+            }
+            assert_eq!(all_results.len(), 1)
+        }
+    }
+
     // #[tokio::test]
     // async fn test_unfinished_transaction() {
     //     let session = setup_session(1).await;

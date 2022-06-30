@@ -42,6 +42,21 @@ impl Txn {
     //     q.run(&self.config, self.connection.clone()).await
     // }
 
+    pub async fn execute(&self, query: Query) -> Result<()> {
+        let mut connection = self.connection.lock().await;
+        let run = BoltRequest::run(&self.config.db.clone(), query);
+        match connection.send_recv(run).await {
+            Ok(BoltResponse::SuccessMessage(_)) => {
+                match connection.send_recv(BoltRequest::discard()).await? {
+                    BoltResponse::SuccessMessage(_) => Ok(()),
+                    msg => Err(unexpected(msg, "DISCARD")),
+                }
+            }
+            msg => Err(unexpected(msg, "RUN")),
+        }
+    }
+
+
     pub async fn run(&self, query: Query) -> Result<RowStream> {
         let run = BoltRequest::run(&self.config.db.clone(), query);
         match self.connection.clone().lock().await.send_recv(run).await {
