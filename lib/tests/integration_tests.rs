@@ -14,6 +14,7 @@ const DEFAULT_MAX_CONNECTIONS: usize = 16;
 
 #[cfg(test)]
 mod integration_tests {
+    use neo4rs::Error;
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
 
@@ -81,25 +82,38 @@ mod integration_tests {
                     txn.execute(query("CREATE (n: Person {name:'apple'}) RETURN n")).await;
                     txn.execute(query("CREATE (n: Person {name:'apple'}) RETURN n")).await;
                     // tx.run(query("CREATE (n: Person {name:'apple'}) RETURN n"));
+                    Ok(())
                 }.boxed()).await;
         }
     }
 
     #[tokio::test]
-    async fn test_write_transaction_with_run() {
+    async fn test_write_transaction_with_error() {
         let mut session = setup_session(1).await;
         {
             let mut result = session.write_transaction(
                 |txn| async move {
-                    let mut result = txn.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
-                    while let Ok(Some(row)) = result.next().await {
-                        let node: Node = row.get("n").unwrap();
-                        let name: String = node.get("name").unwrap();
-                        assert_eq!(name, "apple".to_string())
-                    }
+                    let result = txn.execute(query("CRAT (n: Person {name:'apple'}) RETURN n")).await;
+                    result
                 }.boxed()).await;
         }
     }
+
+    // #[tokio::test]
+    // async fn test_write_transaction_with_run() {
+    //     let mut session = setup_session(1).await;
+    //     {
+    //         let mut result = session.write_transaction(
+    //             |txn| async move {
+    //                 let mut result = txn.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+    //                 while let Ok(Some(row)) = result.next().await {
+    //                     let node: Node = row.get("n").unwrap();
+    //                     let name: String = node.get("name").unwrap();
+    //                     assert_eq!(name, "apple".to_string())
+    //                 }
+    //             }.boxed()).await;
+    //     }
+    // }
     //
     // #[tokio::test]
     // async fn test_read_transaction_pool() {

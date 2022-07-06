@@ -789,6 +789,8 @@ mod types;
 mod version;
 mod session;
 mod driver;
+mod constants;
+mod internal;
 
 pub use crate::config::{config, Config, ConfigBuilder};
 pub use crate::errors::*;
