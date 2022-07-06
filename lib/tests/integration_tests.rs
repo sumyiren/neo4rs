@@ -71,15 +71,6 @@ mod integration_tests {
     #[tokio::test]
     async fn test_write_transaction() {
         let mut session = setup_session(1).await;
-        // {
-        //     let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
-        //     while let Ok(Some(row)) = result.next().await {
-        //         let node: Node = row.get("n").unwrap();
-        //         let name: String = node.get("name").unwrap();
-        //         println!("{}", name);
-        //     }
-        // }
-
         {
             let mut result = session.write_transaction(
                 |txn| async move {
@@ -87,13 +78,26 @@ mod integration_tests {
                     // txn.consume().await;
                     // txn.commit().await;
                     txn.execute(query("CREATE (n: Person {name:'apple'}) RETURN n")).await;
+                    txn.execute(query("CREATE (n: Person {name:'apple'}) RETURN n")).await;
+                    txn.execute(query("CREATE (n: Person {name:'apple'}) RETURN n")).await;
                     // tx.run(query("CREATE (n: Person {name:'apple'}) RETURN n"));
                 }.boxed()).await;
-            // while let Ok(Some(row)) = result.next().await {
-            //     let node: Node = row.get("n").unwrap();
-            //     let name: String = node.get("name").unwrap();
-            //     println!("{}", name);
-            // }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_write_transaction_with_run() {
+        let mut session = setup_session(1).await;
+        {
+            let mut result = session.write_transaction(
+                |txn| async move {
+                    let mut result = txn.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+                    while let Ok(Some(row)) = result.next().await {
+                        let node: Node = row.get("n").unwrap();
+                        let name: String = node.get("name").unwrap();
+                        assert_eq!(name, "apple".to_string())
+                    }
+                }.boxed()).await;
         }
     }
     //
