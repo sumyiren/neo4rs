@@ -8,11 +8,13 @@ use crate::messages::{BoltRequest, BoltResponse};
 use crate::pool::ConnectionPool;
 use crate::types::BoltList;
 use crate::errors::{unexpected, Result};
+use crate::internal::transaction_executor::TransactionExecutor;
 use crate::messages::BoltResponse::SuccessMessage;
 
 pub struct Session {
     config: Config,
-    connection_pool: Arc<ConnectionPool>
+    connection_pool: Arc<ConnectionPool>,
+    // transaction_executor: TransactionExecutor,
 }
 
 
@@ -20,7 +22,8 @@ impl Session {
     pub fn new(config: Config, connection_pool: Arc<ConnectionPool>) -> Self {
         Session {
             config,
-            connection_pool
+            connection_pool,
+            // transaction_executor: TransactionExecutor::new()
         }
     }
 
@@ -85,6 +88,8 @@ impl Session {
             Ok(_) => { txn.commit().await; }
         }
     }
+
+
 }
 
 // pub async fn write_transaction<F> (&mut self, callback: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, ()> {

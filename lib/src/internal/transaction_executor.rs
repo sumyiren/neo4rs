@@ -1,3 +1,4 @@
+use crate::Config;
 
 pub struct TransactionExecutor {
     max_retry_time_ms: u32,
@@ -8,6 +9,10 @@ pub struct TransactionExecutor {
 }
 
 impl TransactionExecutor {
+
+    pub fn new(config: Config) {
+
+    }
     pub fn execute() {
 
 
