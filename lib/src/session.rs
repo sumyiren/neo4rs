@@ -14,16 +14,16 @@ use crate::messages::BoltResponse::SuccessMessage;
 pub struct Session {
     config: Config,
     connection_pool: Arc<ConnectionPool>,
-    // transaction_executor: TransactionExecutor,
+    transaction_executor: TransactionExecutor,
 }
 
 
 impl Session {
     pub fn new(config: Config, connection_pool: Arc<ConnectionPool>) -> Self {
         Session {
+            transaction_executor: TransactionExecutor::new(config.clone()),
             config,
             connection_pool,
-            // transaction_executor: TransactionExecutor::new()
         }
     }
 
@@ -78,15 +78,7 @@ impl Session {
 
     async fn run_transaction<F> (&self, access_mode: AccessMode, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
         let mut txn = self.begin_transaction().await.unwrap();
-        let res = transaction_work(&mut txn).await;
-        match res {
-            Err(E) => {
-                if let Error::UnexpectedMessage(e) = E {
-                    println!("{}", e)
-                }
-            }
-            Ok(_) => { txn.commit().await; }
-        }
+        self.transaction_executor.run_transaction(txn, access_mode, transaction_work).await;
     }
 
 
