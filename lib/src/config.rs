@@ -2,7 +2,7 @@ pub use crate::errors::*;
 
 const DEFAULT_FETCH_SIZE: usize = 200;
 const DEFAULT_MAX_CONNECTIONS: usize = 16;
-const DEFAULT_MAX_RETRY_TIME_MS: usize = 30 * 1000; // 30 seconds
+const DEFAULT_MAX_RETRY_TIME_MS: usize = 50 * 1000; // TODO change this back to 30 seconds
 const DEFAULT_INITIAL_RETRY_DELAY_MS: usize = 1000; // 1 seconds
 const DEFAULT_RETRY_DELAY_MULTIPLIER: f32 = 2.0;
 const DEFAULT_RETRY_DELAY_JITTER_FACTOR: f32 = 0.2;

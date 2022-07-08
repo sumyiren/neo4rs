@@ -7,6 +7,7 @@ use crate::errors::{Result};
 use rand::prelude::*;
 use tokio::time::sleep;
 use async_recursion::async_recursion;
+use crate::Error::UnexpectedMessage;
 
 const MAX_RETRY_DELAY: i64 = i64::MAX / 2;
 
@@ -31,8 +32,9 @@ impl TransactionExecutor {
 
     }
 
-    pub async fn run_transaction<F> (&self, mut txn: Txn, _access_mode: AccessMode, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
-        self.execute_work(txn, _access_mode, transaction_work, -1, self.initial_retry_delay_ms as i64).await;
+    pub async fn run_transaction<F, T> (&self, mut txn: Txn, _access_mode: AccessMode, transaction_work: F) -> Result<T>
+        where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<T>> {
+        return self.execute_work::<F, T>(txn, _access_mode, transaction_work, -1, self.initial_retry_delay_ms as i64).await;
     }
 
     pub fn close() {
@@ -40,22 +42,28 @@ impl TransactionExecutor {
 
     }
 
-    pub async fn execute_work<F> (&self, mut txn: Txn, _access_mode: AccessMode, transaction_work: F, mut start_time: i64, retry_delay_ms: i64) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
+    pub async fn execute_work<F, T> (&self, mut txn: Txn, _access_mode: AccessMode, transaction_work: F, mut start_time: i64, retry_delay_ms: i64) -> Result<T>
+        where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<T>> {
         let res = transaction_work(&mut txn).await;
         match res {
             Err(E) => {
                 println!("hereeee");
+                return Err(E)
                 // if let Error::UnexpectedMessage(e) = E {
                 //     println!("{}", e);
-                    self.retry_transaction(txn, _access_mode, transaction_work, start_time, retry_delay_ms).await;
+                //     self.retry_transaction(txn, _access_mode, transaction_work, start_time, retry_delay_ms).await;
                 // }
             }
-            Ok(_) => { txn.commit().await; }
+            Ok(_) => {
+                txn.commit().await;
+                return res
+            }
         }
     }
 
-    #[async_recursion(?Send)]
-    async fn retry_transaction<F>(&self, mut txn: Txn, access_mode: AccessMode, transaction_work: F, mut start_time: i64, retry_delay_ms: i64) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
+    #[async_recursion(?Send)] // see cd lib, cargo expand internal
+    async fn retry_transaction<F, T>(&self, mut txn: Txn, access_mode: AccessMode, transaction_work: F, mut start_time: i64, retry_delay_ms: i64) -> Result<T>
+        where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<T>> {
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
         if start_time == -1 {
             start_time = current_time;
@@ -65,15 +73,17 @@ impl TransactionExecutor {
         let delay_with_jitter_ms = self.compute_delay_with_jitter(retry_delay_ms);
         let new_retry_delay_ms = retry_delay_ms as f32 * self.multiplier;
         println!("{}", elapsed_time);
+        let mut res = Err(UnexpectedMessage("failed retry transaction".to_string()));
         if elapsed_time < self.max_retry_time_ms as i64 {
             sleep(Duration::from_millis(delay_with_jitter_ms as u64)).await;
             // async move {
-            self.execute_work(txn, access_mode, transaction_work, start_time, new_retry_delay_ms as i64).await
+            res = self.execute_work::<F, T>(txn, access_mode, transaction_work, start_time, new_retry_delay_ms as i64).await
             // println!("retrying hereee0");
             // Box::pin(
             // println!("retrying hereee2");
             // }.boxed()
         }
+        res
     }
 
     fn compute_delay_with_jitter(&self, mut delay_ms: i64) -> f32 {

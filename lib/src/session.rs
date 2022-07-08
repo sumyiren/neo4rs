@@ -66,17 +66,19 @@ impl Session {
     // inspired by https://users.rust-lang.org/t/function-that-takes-an-async-closure/61663/2
     /// auto-commited write transactions - do these perform retries?
     // no trait alias right now https://stackoverflow.com/questions/44246722/is-there-any-way-to-create-an-alias-of-a-specific-fnmut
-    pub async fn write_transaction<F> (&mut self, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
-        self.run_transaction(AccessMode::Write, transaction_work).await;
+    pub async fn write_transaction<T, F> (&mut self, transaction_work: F) -> Result<T>
+        where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<T>> {
+        return self.run_transaction::<F, T>(AccessMode::Write, transaction_work).await;
     }
 
-    pub async fn read_transaction<F> (&mut self, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
-        self.run_transaction(AccessMode::Read, transaction_work).await;
-    }
+    // pub async fn read_transaction<F> (&mut self, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
+    //     self.run_transaction(AccessMode::Read, transaction_work).await;
+    // }
 
-    async fn run_transaction<F> (&self, access_mode: AccessMode, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
+    async fn run_transaction<F, T> (&self, access_mode: AccessMode, transaction_work: F) -> Result<T>
+        where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<T>> {
         let txn = self.begin_transaction().await.unwrap();
-        self.transaction_executor.run_transaction(txn, access_mode, transaction_work).await;
+        return self.transaction_executor.run_transaction::<F, T>(txn, access_mode, transaction_work).await;
     }
 
 
