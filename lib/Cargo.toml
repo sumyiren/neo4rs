@@ -23,6 +23,7 @@ deadpool = "0.7.0"
 chrono = "0.4.19"
 log = "0.4"
 rand = "0.8.5"
+async-recursion = "1.0.0"
 
 [dev-dependencies]
 uuid = { version = "0.8", features = ["v4"] }

@@ -1,8 +1,12 @@
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use futures::future::BoxFuture;
+use futures::FutureExt;
 use crate::{Config, Error, Txn};
 use crate::constants::AccessMode;
 use crate::errors::{Result};
 use rand::prelude::*;
+use tokio::time::sleep;
+use async_recursion::async_recursion;
 
 const MAX_RETRY_DELAY: i64 = i64::MAX / 2;
 
@@ -28,16 +32,7 @@ impl TransactionExecutor {
     }
 
     pub async fn run_transaction<F> (&self, mut txn: Txn, _access_mode: AccessMode, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
-        let res = transaction_work(&mut txn).await;
-        match res {
-            Err(E) => {
-                if let Error::UnexpectedMessage(e) = E {
-                    println!("{}", e);
-                    // self.retry_transaction(txn, transaction_work, -1, self.initial_retry_delay_ms as i64).await;
-                }
-            }
-            Ok(_) => { txn.commit().await; }
-        }
+        self.execute_work(txn, _access_mode, transaction_work, -1, self.initial_retry_delay_ms as i64).await;
     }
 
     pub fn close() {
@@ -45,22 +40,41 @@ impl TransactionExecutor {
 
     }
 
-    // async fn retry_transaction<F>(&self, mut txn: Txn, transaction_work: F, mut start_time: i64, retry_delay_ms: i64) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
-    //     let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
-    //     if start_time == -1 {
-    //         start_time = current_time;
-    //     }
-    //
-    //     let elapsed_time = current_time - start_time;
-    //     let delay_with_jitter_ms = self.compute_delay_with_jitter(retry_delay_ms);
-    //     let new_retry_delay_ms = retry_delay_ms as f32 * self.multiplier;
-    //     if elapsed_time < self.max_retry_time_ms as i64 {
-    //         sleep(Duration::from_millis(delay_with_jitter_ms as u64)).await;
-    //         async move {
-    //             self.retry_transaction(txn, transaction_work, start_time, new_retry_delay_ms as i64).await;
-    //         }.boxed()
-    //     }
-    // }
+    pub async fn execute_work<F> (&self, mut txn: Txn, _access_mode: AccessMode, transaction_work: F, mut start_time: i64, retry_delay_ms: i64) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
+        let res = transaction_work(&mut txn).await;
+        match res {
+            Err(E) => {
+                println!("hereeee");
+                // if let Error::UnexpectedMessage(e) = E {
+                //     println!("{}", e);
+                    self.retry_transaction(txn, _access_mode, transaction_work, start_time, retry_delay_ms).await;
+                // }
+            }
+            Ok(_) => { txn.commit().await; }
+        }
+    }
+
+    #[async_recursion(?Send)]
+    async fn retry_transaction<F>(&self, mut txn: Txn, access_mode: AccessMode, transaction_work: F, mut start_time: i64, retry_delay_ms: i64) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
+        let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
+        if start_time == -1 {
+            start_time = current_time;
+        }
+
+        let elapsed_time = current_time - start_time;
+        let delay_with_jitter_ms = self.compute_delay_with_jitter(retry_delay_ms);
+        let new_retry_delay_ms = retry_delay_ms as f32 * self.multiplier;
+        println!("{}", elapsed_time);
+        if elapsed_time < self.max_retry_time_ms as i64 {
+            sleep(Duration::from_millis(delay_with_jitter_ms as u64)).await;
+            // async move {
+            self.execute_work(txn, access_mode, transaction_work, start_time, new_retry_delay_ms as i64).await
+            // println!("retrying hereee0");
+            // Box::pin(
+            // println!("retrying hereee2");
+            // }.boxed()
+        }
+    }
 
     fn compute_delay_with_jitter(&self, mut delay_ms: i64) -> f32 {
         if delay_ms > MAX_RETRY_DELAY {
