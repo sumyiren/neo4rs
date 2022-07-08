@@ -1,5 +1,5 @@
 use futures::future::BoxFuture;
-use crate::{Config, Txn};
+use crate::{Config, Error, Txn};
 use crate::constants::AccessMode;
 use crate::errors::{Result};
 use rand::prelude::*;
@@ -28,16 +28,16 @@ impl TransactionExecutor {
     }
 
     pub async fn run_transaction<F> (&self, mut txn: Txn, _access_mode: AccessMode, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
-        let _res = transaction_work(&mut txn).await;
-        // match res {
-        //     Err(E) => {
-        //         if let Error::UnexpectedMessage(e) = E {
-        //             println!("{}", e);
-        //             self.retry_transaction(txn, transaction_work, -1, self.initial_retry_delay_ms as i64).await;
-        //         }
-        //     }
-        //     Ok(_) => { txn.commit().await; }
-        // }
+        let res = transaction_work(&mut txn).await;
+        match res {
+            Err(E) => {
+                if let Error::UnexpectedMessage(e) = E {
+                    println!("{}", e);
+                    // self.retry_transaction(txn, transaction_work, -1, self.initial_retry_delay_ms as i64).await;
+                }
+            }
+            Ok(_) => { txn.commit().await; }
+        }
     }
 
     pub fn close() {
