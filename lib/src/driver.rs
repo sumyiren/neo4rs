@@ -1,8 +1,6 @@
 use std::sync::Arc;
-use crate::config::{config, Config};
-use crate::errors::*;
+use crate::config::{Config};
 use crate::pool::{create_pool, ConnectionPool};
-use crate::txn::Txn;
 use crate::session::Session;
 
 pub struct Driver {

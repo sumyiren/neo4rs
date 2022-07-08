@@ -1,10 +1,7 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use futures::future::BoxFuture;
-use futures::FutureExt;
-use crate::{Config, Error, Txn};
+use crate::{Config, Txn};
 use crate::constants::AccessMode;
-use crate::errors::{unexpected, Result};
-use tokio::time::{sleep};
+use crate::errors::{Result};
 use rand::prelude::*;
 
 const MAX_RETRY_DELAY: i64 = i64::MAX / 2;
@@ -30,8 +27,8 @@ impl TransactionExecutor {
 
     }
 
-    pub async fn run_transaction<F> (&self, mut txn: Txn, access_mode: AccessMode, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
-        let res = transaction_work(&mut txn).await;
+    pub async fn run_transaction<F> (&self, mut txn: Txn, _access_mode: AccessMode, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
+        let _res = transaction_work(&mut txn).await;
         // match res {
         //     Err(E) => {
         //         if let Error::UnexpectedMessage(e) = E {

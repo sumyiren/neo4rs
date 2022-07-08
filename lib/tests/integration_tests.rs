@@ -1,7 +1,7 @@
 use tokio;
-use neo4rs::{query, Graph, Query, Node, Session};
+use neo4rs::{query, Graph, Node, Session};
 use std::sync::Arc;
-use ::futures::future::{BoxFuture, FutureExt};
+use ::futures::future::{FutureExt};
 
 // let mut result = session.write_transaction(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
 // while let Ok(Some(row)) = result.next().await {
@@ -14,7 +14,7 @@ const DEFAULT_MAX_CONNECTIONS: usize = 16;
 
 #[cfg(test)]
 mod integration_tests {
-    use neo4rs::Error;
+    
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
 
@@ -32,7 +32,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_session_execute() {
         let session = setup_session(1).await;
-        let result = session.execute(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+        let _result = session.execute(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
     }
 
     #[tokio::test]
@@ -50,11 +50,11 @@ mod integration_tests {
     async fn test_session_run_consume() {
         let session = setup_session(1).await;
         {
-            let mut result = session.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+            let result = session.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
             result.consume().await;
         }
         {
-            let mut result = session.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+            let result = session.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
             result.consume().await;
         }
         {
@@ -62,7 +62,7 @@ mod integration_tests {
             let mut count = 0;
             while let Ok(Some(row)) = result.next().await {
                 let node: Node = row.get("n").unwrap();
-                let name: String = node.get("name").unwrap();
+                let _name: String = node.get("name").unwrap();
                 count += 1;
             }
             assert_eq!(count, 2)
@@ -73,7 +73,7 @@ mod integration_tests {
     async fn test_write_transaction() {
         let mut session = setup_session(1).await;
         {
-            let mut result = session.write_transaction(
+            let _result = session.write_transaction(
                 |txn| async move {
                     // let mut result = txn.run(query("CREATE (n: Person {name:'apple-pie'}) RETURN n")).await.unwrap();
                     // txn.consume().await;
@@ -91,7 +91,7 @@ mod integration_tests {
     async fn test_write_transaction_with_error() {
         let mut session = setup_session(1).await;
         {
-            let mut result = session.write_transaction(
+            let _result = session.write_transaction(
                 |txn| async move {
                     let result = txn.execute(query("CRAT (n: Person {name:'apple'}) RETURN n")).await;
                     result

@@ -1,15 +1,13 @@
 use std::sync::{Arc};
 use futures::future::BoxFuture;
 use tokio::sync::Mutex;
-use crate::{config, Config, Error, Query, RowStream, Txn};
-use crate::connection::Connection;
+use crate::{Config, Query, RowStream, Txn};
 use crate::constants::AccessMode;
 use crate::messages::{BoltRequest, BoltResponse};
 use crate::pool::ConnectionPool;
 use crate::types::BoltList;
 use crate::errors::{unexpected, Result};
 use crate::internal::transaction_executor::TransactionExecutor;
-use crate::messages::BoltResponse::SuccessMessage;
 
 pub struct Session {
     config: Config,
@@ -42,7 +40,7 @@ impl Session {
     }
 
     pub async fn run(&self, query: Query) -> Result<RowStream> {
-        let mut connection = Arc::new(Mutex::new(self.connection_pool.get().await?));
+        let connection = Arc::new(Mutex::new(self.connection_pool.get().await?));
         let run = BoltRequest::run(&self.config.db.clone(), query);
         match connection.clone().lock().await.send_recv(run).await {
             Ok(BoltResponse::SuccessMessage(success)) => {
@@ -77,7 +75,7 @@ impl Session {
     }
 
     async fn run_transaction<F> (&self, access_mode: AccessMode, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
-        let mut txn = self.begin_transaction().await.unwrap();
+        let txn = self.begin_transaction().await.unwrap();
         self.transaction_executor.run_transaction(txn, access_mode, transaction_work).await;
     }
 

@@ -18,7 +18,7 @@ pub struct Txn {
 }
 
 impl Txn {
-    pub(crate) async fn new(config: Config, mut connection: Arc<Mutex<ManagedConnection>>) -> Result<Self> {
+    pub(crate) async fn new(config: Config, connection: Arc<Mutex<ManagedConnection>>) -> Result<Self> {
         let begin = BoltRequest::begin();
         match connection.lock().await.send_recv(begin).await? {
             BoltResponse::SuccessMessage(_) => Ok(Txn {

@@ -1,11 +1,6 @@
 use crate::config::{config, Config};
 use crate::errors::*;
-use crate::pool::{create_pool, ConnectionPool};
 use crate::query::Query;
-use crate::stream::RowStream;
-use crate::txn::Txn;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use crate::driver::Driver;
 
 /// A neo4j database abstraction
