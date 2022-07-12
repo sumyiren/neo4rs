@@ -71,9 +71,10 @@ impl Session {
         return self.run_transaction::<F, T>(AccessMode::Write, transaction_work).await;
     }
 
-    // pub async fn read_transaction<F> (&mut self, transaction_work: F) where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<()>> {
-    //     self.run_transaction(AccessMode::Read, transaction_work).await;
-    // }
+    pub async fn read_transaction<T, F> (&mut self, transaction_work: F) -> Result<T>
+        where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<T>> {
+        return self.run_transaction::<F, T>(AccessMode::Read, transaction_work).await;
+    }
 
     async fn run_transaction<F, T> (&self, access_mode: AccessMode, transaction_work: F) -> Result<T>
         where F: Fn(&'_ mut Txn) -> BoxFuture<'_, Result<T>> {

@@ -122,43 +122,43 @@ mod integration_tests {
         }
     }
 
-    // #[tokio::test]
-    // async fn test_write_transaction_with_run() {
-    //     let mut session = setup_session(1).await;
-    //     {
-    //         let mut result = session.write_transaction(
-    //             |txn| async move {
-    //                 let mut result = txn.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
-    //                 while let Ok(Some(row)) = result.next().await {
-    //                     let node: Node = row.get("n").unwrap();
-    //                     let name: String = node.get("name").unwrap();
-    //                     assert_eq!(name, "apple".to_string())
-    //                 }
-    //             }.boxed()).await;
-    //     }
-    // }
-    //
-    // #[tokio::test]
-    // async fn test_read_transaction_pool() {
-    //     let session = setup_session(1).await;
-    //     {
-    //         let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
-    //         while let Ok(Some(row)) = result.next().await {
-    //             let node: Node = row.get("n").unwrap();
-    //             let name: String = node.get("name").unwrap();
-    //             println!("{}", name);
-    //         }
-    //     } // connection is released and returned to pool here
-    //
-    //     {
-    //         let mut result = session.read_transaction(query("MATCH (n: Person) RETURN n")).await.unwrap();
-    //         while let Ok(Some(row)) = result.next().await {
-    //             let node: Node = row.get("n").unwrap();
-    //             let name: String = node.get("name").unwrap();
-    //             println!("{}", name);
-    //         }
-    //     }
-    // }
+    #[tokio::test]
+    async fn test_write_transaction_with_run() {
+        let mut session = setup_session(1).await;
+        {
+            let mut result = session.write_transaction(
+                |txn| async move {
+                    let mut result = txn.run(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+                    while let Ok(Some(row)) = result.next().await {
+                        let node: Node = row.get("n").unwrap();
+                        let name: String = node.get("name").unwrap();
+                        assert_eq!(name, "apple".to_string())
+                    }
+                    Ok(())
+                }.boxed()).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_read_transaction_pool() {
+        let mut session = setup_session(1).await;
+        session.execute(query("CREATE (n: Person {name:'apple'}) RETURN n")).await.unwrap();
+        {
+            let result = session.read_transaction::<Vec<String>, _>(
+                |txn| async move {
+                    let mut result = txn.run(query("MATCH (n: Person) RETURN n")).await.unwrap();
+                    let mut names: Vec<String> = Vec::new();
+                    while let Ok(Some(row)) = result.next().await {
+                        let node: Node = row.get("n").unwrap();
+                        let name: String = node.get("name").unwrap();
+                        assert_eq!(name, "apple".to_string());
+                        names.push(name);
+                    }
+                    Ok(names)
+                }.boxed()).await;
+            assert_eq!(result.unwrap(), vec!("apple"));
+        }
+    }
 
     #[tokio::test]
     async fn test_execute_transaction() {
