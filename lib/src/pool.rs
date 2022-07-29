@@ -31,7 +31,8 @@ impl deadpool::managed::Manager<Connection, Error> for ConnectionManager {
     }
 
     async fn recycle(&self, conn: &mut Connection) -> deadpool::managed::RecycleResult<Error> {
-        Ok(conn.reset().await?)
+        conn.reset().await?;
+        Ok(())
     }
 }
 

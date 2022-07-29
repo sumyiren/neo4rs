@@ -16,7 +16,7 @@ categories = ["database", "network-programming", "asynchronous"]
 [dependencies]
 neo4rs-macros = { version = "0.2.1", path = "../macros" }
 futures = { version = "0.3.8" }
-tokio = { version = "1.0.1", features = ["full"] }
+#tokio = { version = "1.0.1", features = ["full"] }
 bytes = "1.0.0"
 async-trait = "0.1.42"
 deadpool = "0.7.0"
@@ -24,6 +24,10 @@ chrono = "0.4.19"
 log = "0.4"
 rand = "0.8.5"
 async-recursion = "1.0.0"
+bolt-client =  { path = "../../bolt-rs/bolt-client", features = ["tokio-stream"] }
+tokio = { version = "1.14.0", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+tokio-util = { version = "0.6.0", features = ["compat"] }
 
 [dev-dependencies]
 uuid = { version = "0.8", features = ["v4"] }
+
